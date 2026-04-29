@@ -18,9 +18,11 @@ import {
   type WeatherUpdateEvent,
   type PortCongestionEvent,
 } from '@smart-supply/shared-types';
+import { registerAllSchemas, indexById, SCHEMA_ID_HEADER } from '@smart-supply/proto';
 
 const Env = z.object({
   KAFKA_BROKERS: z.string().default('localhost:19092'),
+  SCHEMA_REGISTRY_URL: z.string().url().default('http://localhost:8081'),
   DATABASE_URL: z.string().url(),
   SIM_EVENTS_PER_SEC: z.coerce.number().int().positive().default(200),
   SIM_SHIPMENTS: z.coerce.number().int().positive().default(50),
@@ -98,6 +100,30 @@ async function main(): Promise<void> {
   await producer.connect();
   log.info('producer connected');
 
+  // Register schemas for every topic with the registry. Wait + retry since
+  // Redpanda's schema-registry HTTP server starts a few seconds after Kafka.
+  let schemaIds: ReturnType<typeof indexById> = new Map();
+  for (let attempt = 0; attempt < 15; attempt++) {
+    try {
+      const registered = await registerAllSchemas({ url: cfg.SCHEMA_REGISTRY_URL });
+      schemaIds = indexById(registered);
+      log.info({ count: registered.length }, 'schemas registered');
+      break;
+    } catch (err) {
+      log.warn(
+        { attempt, err: (err as Error).message },
+        'schema registry not ready; retrying',
+      );
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  const headerForTopic = (topic: string): Record<string, Buffer> | undefined => {
+    const id = schemaIds.get(topic);
+    return id === undefined
+      ? undefined
+      : { [SCHEMA_ID_HEADER]: Buffer.from(String(id)) };
+  };
+
   const shipments: Shipment[] = Array.from({ length: cfg.SIM_SHIPMENTS }, (_, i) => {
     const route = routes[i % routes.length]!;
     return {
@@ -164,11 +190,23 @@ async function main(): Promise<void> {
         topicMessages: [
           {
             topic: KafkaTopic.ShipmentPosition,
-            messages: [{ key: ship.id, value: JSON.stringify(pos) }],
+            messages: [
+              {
+                key: ship.id,
+                value: JSON.stringify(pos),
+                headers: headerForTopic(KafkaTopic.ShipmentPosition),
+              },
+            ],
           },
           {
             topic: KafkaTopic.ShipmentFuel,
-            messages: [{ key: ship.id, value: JSON.stringify(fuel) }],
+            messages: [
+              {
+                key: ship.id,
+                value: JSON.stringify(fuel),
+                headers: headerForTopic(KafkaTopic.ShipmentFuel),
+              },
+            ],
           },
         ],
       })
@@ -189,7 +227,13 @@ async function main(): Promise<void> {
       producer
         .send({
           topic: KafkaTopic.WeatherUpdate,
-          messages: [{ key: ev.region, value: JSON.stringify(ev) }],
+          messages: [
+            {
+              key: ev.region,
+              value: JSON.stringify(ev),
+              headers: headerForTopic(KafkaTopic.WeatherUpdate),
+            },
+          ],
         })
         .catch(() => undefined);
     }
@@ -209,7 +253,13 @@ async function main(): Promise<void> {
     producer
       .send({
         topic: KafkaTopic.PortCongestion,
-        messages: [{ key: hubId, value: JSON.stringify(ev) }],
+        messages: [
+          {
+            key: hubId,
+            value: JSON.stringify(ev),
+            headers: headerForTopic(KafkaTopic.PortCongestion),
+          },
+        ],
       })
       .catch(() => undefined);
   }, 10000);

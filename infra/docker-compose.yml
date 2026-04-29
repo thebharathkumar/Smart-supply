@@ -58,9 +58,11 @@ services:
       - --advertise-kafka-addr=PLAINTEXT://redpanda:9092,OUTSIDE://localhost:19092
       - --pandaproxy-addr=0.0.0.0:8082
       - --advertise-pandaproxy-addr=localhost:8082
+      - --schema-registry-addr=0.0.0.0:8081
     ports:
-      - "19092:19092"
-      - "9644:9644"
+      - "19092:19092"  # Kafka
+      - "8081:8081"    # Schema Registry (Confluent-compatible HTTP API)
+      - "9644:9644"    # Admin
     healthcheck:
       test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true'"]
       interval: 10s
@@ -83,6 +85,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-smartsupply}:${POSTGRES_PASSWORD:-changeme_dev_only}@postgres:5432/${POSTGRES_DB:-smartsupply}
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
       BACKEND_PORT: 4000
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
@@ -111,6 +114,7 @@ services:
       backend: { condition: service_healthy }
     environment:
       KAFKA_BROKERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
       SIM_EVENTS_PER_SEC: ${SIM_EVENTS_PER_SEC:-200}
       SIM_SHIPMENTS: ${SIM_SHIPMENTS:-50}
       DATABASE_URL: postgres://${POSTGRES_USER:-smartsupply}:${POSTGRES_PASSWORD:-changeme_dev_only}@postgres:5432/${POSTGRES_DB:-smartsupply}

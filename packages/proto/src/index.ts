@@ -60,3 +60,14 @@ export const TOPIC_VALIDATORS = {
   [KafkaTopic.WeatherUpdate]: WeatherUpdateEvent,
   [KafkaTopic.ShipmentScoreUpdated]: ShipmentScoreUpdatedEvent,
 } as const;
+
+// Schema Registry client + helpers.
+export {
+  registerAllSchemas,
+  indexById,
+  validateForTopic,
+  SCHEMA_ID_HEADER,
+  type SchemaRegistryConfig,
+  type RegisteredSchema,
+  type SchemaIdMap,
+} from './registry.js';

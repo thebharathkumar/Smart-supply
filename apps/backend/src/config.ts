@@ -9,6 +9,7 @@ const Schema = z.object({
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
   KAFKA_BROKERS: z.string().default('localhost:19092'),
   KAFKA_CLIENT_ID: z.string().default('smart-supply-backend'),
+  SCHEMA_REGISTRY_URL: z.string().url().default('http://localhost:8081'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   ML_FORECAST_URL: z.string().url().default('http://localhost:8001'),
   ML_OPTIMIZE_URL: z.string().url().default('http://localhost:8002'),

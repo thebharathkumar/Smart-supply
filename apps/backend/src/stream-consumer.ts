@@ -17,6 +17,11 @@ import {
   KafkaTopic,
   type ShipmentScoreUpdatedEvent,
 } from '@smart-supply/shared-types';
+import {
+  SCHEMA_ID_HEADER,
+  registerAllSchemas,
+  validateForTopic,
+} from '@smart-supply/proto';
 import { TRANSPORT_MODE_FACTORS } from './lib/factors.js';
 import type postgres from 'postgres';
 import type { WsHub } from './ws-hub.js';
@@ -45,16 +50,19 @@ export class StreamConsumer {
     string,
     { supplierId: string; transportMode: keyof typeof TRANSPORT_MODE_FACTORS; distanceKm: number }
   >();
+  private schemaIds = new Map<string, number>();
 
   constructor(
     private readonly kafka: Kafka,
     private readonly sql: ReturnType<typeof postgres>,
     private readonly hub: WsHub,
     private readonly log: Logger,
+    private readonly schemaRegistryUrl?: string,
   ) {}
 
   async start(): Promise<void> {
     await this.loadRouteMeta();
+    await this.registerSchemas();
 
     this.consumer = this.kafka.consumer({ groupId: 'backend-stream-consumer' });
     this.producer = this.kafka.producer({ allowAutoTopicCreation: true });
@@ -70,6 +78,25 @@ export class StreamConsumer {
 
     this.flushTimer = setInterval(() => this.flushExpired(), 1000);
     this.log.info('stream consumer started');
+  }
+
+  private async registerSchemas(): Promise<void> {
+    if (!this.schemaRegistryUrl) return;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        const registered = await registerAllSchemas({ url: this.schemaRegistryUrl });
+        for (const r of registered) this.schemaIds.set(r.topic, r.schemaId);
+        this.log.info({ count: registered.length }, 'schemas registered');
+        return;
+      } catch (err) {
+        this.log.warn(
+          { attempt, err: (err as Error).message },
+          'schema registry not ready; retrying',
+        );
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+    this.log.warn('schema registry unavailable; emitting without headers');
   }
 
   private async loadRouteMeta(): Promise<void> {
@@ -99,6 +126,20 @@ export class StreamConsumer {
     try {
       parsed = JSON.parse(text);
     } catch {
+      return;
+    }
+
+    // Schema-registry contract check. We don't fetch the schema on every
+    // message (would burn CPU); we just confirm the producer attached an
+    // id header. Local Zod validation does the heavy lifting for shape.
+    const schemaIdHeader = message.headers?.[SCHEMA_ID_HEADER];
+    if (schemaIdHeader === undefined) {
+      this.log.warn({ topic }, 'message missing schema id header; dropping');
+      return;
+    }
+    const validationError = validateForTopic(topic, parsed);
+    if (validationError) {
+      this.log.warn({ topic, validationError }, 'schema validation failed; dropping');
       return;
     }
 
@@ -200,10 +241,20 @@ export class StreamConsumer {
     };
 
     // Fire-and-forget Kafka emit; don't block fanout on broker latency.
+    const scoreSchemaId = this.schemaIds.get(KafkaTopic.ShipmentScoreUpdated);
     this.producer
       ?.send({
         topic: KafkaTopic.ShipmentScoreUpdated,
-        messages: [{ key: w.routeId, value: JSON.stringify(event) }],
+        messages: [
+          {
+            key: w.routeId,
+            value: JSON.stringify(event),
+            headers:
+              scoreSchemaId !== undefined
+                ? { [SCHEMA_ID_HEADER]: Buffer.from(String(scoreSchemaId)) }
+                : undefined,
+          },
+        ],
       })
       .catch((err) => this.log.warn({ err }, 'producer send failed'));
 

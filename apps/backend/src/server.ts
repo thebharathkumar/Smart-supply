@@ -78,7 +78,7 @@ async function main(): Promise<void> {
       brokers: cfg.KAFKA_BROKERS.split(',').map((s) => s.trim()),
       retry: { retries: 5, initialRetryTime: 300 },
     });
-    consumer = new StreamConsumer(kafka, app.pg, app.wsHub, log);
+    consumer = new StreamConsumer(kafka, app.pg, app.wsHub, log, cfg.SCHEMA_REGISTRY_URL);
     consumer.start().catch((err) => log.error({ err }, 'stream consumer crashed'));
   }
 
