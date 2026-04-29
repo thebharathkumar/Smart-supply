@@ -65,18 +65,27 @@ class OptimizerInput:
     weight_cost: float = 0.3
     weight_time: float = 0.2
     top_k: int = 3
+    # When provided, edge CO2 is multiplied by this map[route_id] before
+    # ranking. Produced by gnn_inference.GnnPredictor.adjust_edges().
+    edge_co2_multipliers: dict[str, float] | None = None
 
 
-def build_graph(routes: list[dict]) -> nx.MultiDiGraph:
+def build_graph(
+    routes: list[dict],
+    edge_co2_multipliers: dict[str, float] | None = None,
+) -> nx.MultiDiGraph:
     g: nx.MultiDiGraph = nx.MultiDiGraph()
     for r in routes:
         mode = r["transport_mode"]
         dist = float(r["distance_km"])
+        rid = str(r["id"])
+        baseline_co2 = dist * MODE_CO2_PER_KM.get(mode, 0.05)
+        mult = (edge_co2_multipliers or {}).get(rid, 1.0)
         meta = EdgeMeta(
-            route_id=str(r["id"]),
+            route_id=rid,
             transport_mode=mode,
             distance_km=dist,
-            co2_kg=dist * MODE_CO2_PER_KM.get(mode, 0.05),
+            co2_kg=baseline_co2 * mult,
             cost_usd=dist * MODE_COST_PER_KM.get(mode, 0.10),
             time_hours=dist * MODE_HOURS_PER_KM.get(mode, 0.02),
         )
@@ -147,7 +156,7 @@ def _mutate(
 
 def optimize(routes: list[dict], req: OptimizerInput, *, seed: int = 0) -> list[Solution]:
     rng = random.Random(seed)
-    g = build_graph(routes)
+    g = build_graph(routes, edge_co2_multipliers=req.edge_co2_multipliers)
     if req.origin_hub_id not in g or req.destination_hub_id not in g:
         return []
 

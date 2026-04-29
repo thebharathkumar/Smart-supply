@@ -20,6 +20,8 @@ from fastapi.responses import PlainTextResponse
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from pydantic import BaseModel, Field
 
+from .gnn import EdgeContext, HubFeatures
+from .gnn_inference import GnnPredictor, from_env as gnn_from_env
 from .optimizer import OptimizerInput, optimize
 from .telemetry import init_telemetry, instrument_app
 
@@ -38,7 +40,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     dsn = os.environ["DATABASE_URL"]
     pool = await asyncpg.create_pool(dsn, min_size=1, max_size=4)
     app.state.pool = pool
-    log.info("ml-optimize started")
+    gnn = gnn_from_env()
+    gnn.load()
+    app.state.gnn = gnn
+    log.info("ml-optimize started", gnn_available=gnn.available)
     try:
         yield
     finally:
@@ -56,6 +61,10 @@ class OptimizeRequest(BaseModel):
     weightCost: float = Field(0.3, ge=0, le=1)
     weightTime: float = Field(0.2, ge=0, le=1)
     topK: int = Field(3, ge=1, le=10)
+    # Phase 3: opt-in GNN-adjusted edge weights based on current conditions.
+    # When true and a model is loaded, optimizer uses GNN multipliers; otherwise
+    # silently falls back to baseline factors.
+    useGnn: bool = False
 
 
 class ParetoSolutionDTO(BaseModel):
@@ -102,6 +111,44 @@ async def optimize_route(req: OptimizeRequest) -> OptimizeResponse:
         if not rows:
             raise HTTPException(status_code=503, detail="no active routes")
 
+        edge_multipliers: dict[str, float] | None = None
+        gnn: GnnPredictor = app.state.gnn
+        if req.useGnn and gnn.available:
+            hub_rows = await pool.fetch(
+                "SELECT id::text AS id, type::text AS type, lat, lng, country FROM hubs"
+            )
+            # Compute degree per hub for the node feature.
+            degree: dict[str, int] = {}
+            for r in rows:
+                degree[str(r["origin_hub_id"])] = degree.get(str(r["origin_hub_id"]), 0) + 1
+                degree[str(r["destination_hub_id"])] = degree.get(str(r["destination_hub_id"]), 0) + 1
+            hubs_input = [
+                (
+                    h["id"],
+                    HubFeatures(
+                        type=h["type"],
+                        lat=h["lat"],
+                        lng=h["lng"],
+                        degree=degree.get(h["id"], 0),
+                        country_bucket=(hash(h["country"]) % 256) / 256.0,
+                    ),
+                )
+                for h in hub_rows
+            ]
+            edges_input = [
+                (
+                    str(r["id"]),
+                    str(r["origin_hub_id"]),
+                    str(r["destination_hub_id"]),
+                    EdgeContext(
+                        transport_mode=r["transport_mode"],
+                        distance_km=float(r["distance_km"]),
+                    ),
+                )
+                for r in rows
+            ]
+            edge_multipliers = gnn.adjust_edges(hubs_input, edges_input)
+
         opt_input = OptimizerInput(
             origin_hub_id=req.originHubId,
             destination_hub_id=req.destinationHubId,
@@ -109,6 +156,7 @@ async def optimize_route(req: OptimizeRequest) -> OptimizeResponse:
             weight_cost=req.weightCost,
             weight_time=req.weightTime,
             top_k=req.topK,
+            edge_co2_multipliers=edge_multipliers,
         )
         solutions = optimize([dict(r) for r in rows], opt_input)
         if not solutions:

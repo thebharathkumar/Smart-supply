@@ -1,0 +1,11 @@
+# Heavy ML deps for the optional GNN edge-weight predictor.
+# Install separately so the base ml-optimize image stays small.
+#
+# Usage:
+#   pip install -r requirements.txt
+#   pip install -r requirements-gnn.txt        # only on training/inference nodes
+#
+# The service runs without these installed - GnnPredictor.load() falls
+# back to baseline factors when torch isn't importable.
+torch>=2.4.0
+torch-geometric>=2.6.0
