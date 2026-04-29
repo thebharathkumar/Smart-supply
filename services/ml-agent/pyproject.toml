@@ -1,0 +1,5 @@
+[project]
+name = "smart-supply-ml-agent"
+version = "0.1.0"
+description = "Agentic reasoning service for supply chain optimization"
+requires-python = ">=3.11"
