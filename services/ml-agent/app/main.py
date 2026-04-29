@@ -18,7 +18,7 @@ from typing import AsyncIterator
 import asyncpg
 import httpx
 import structlog
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from pydantic import BaseModel, Field

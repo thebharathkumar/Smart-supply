@@ -8,8 +8,6 @@ from __future__ import annotations
 import datetime as dt
 from unittest.mock import patch
 
-import pandas as pd
-import pytest
 
 from app import forecaster as fc
 

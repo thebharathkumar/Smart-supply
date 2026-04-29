@@ -26,7 +26,7 @@ from typing import Any, AsyncIterator
 
 from opentelemetry import trace
 
-from .agent_state import AgentState, NodeName, ToolCall
+from .agent_state import AgentState, ToolCall
 from .llm import LLMClient
 from .tools import Tool
 

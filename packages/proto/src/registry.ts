@@ -12,6 +12,7 @@
  * easier to debug with kcat / rpk than the binary envelope.
  */
 import { z } from 'zod';
+import { zodToJsonSchema as convert } from 'zod-to-json-schema';
 import { TOPICS, TOPIC_VALIDATORS } from './index.js';
 
 export interface SchemaRegistryConfig {
@@ -28,16 +29,10 @@ export interface RegisteredSchema {
 export const SCHEMA_ID_HEADER = 'smartsupply.schema_id';
 
 /**
- * Strip Zod 'default' wrappers and other complexity that confuses
- * registries. We keep just the validator's high-level structure.
+ * Convert a Zod schema to JSON Schema for registry submission.
  */
 function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
-  // Lazy import so consumers without zod-to-json-schema can still build.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-  const { zodToJsonSchema: convert } = require('zod-to-json-schema') as {
-    zodToJsonSchema: (s: unknown, name?: string) => Record<string, unknown>;
-  };
-  return convert(schema);
+  return convert(schema) as Record<string, unknown>;
 }
 
 async function postSchema(

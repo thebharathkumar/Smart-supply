@@ -38,7 +38,6 @@ import asyncpg  # noqa: E402
 from app.gnn import (  # noqa: E402
     EDGE_FEATURE_DIM,
     NODE_FEATURE_DIM,
-    TRANSPORT_MODES,
     EdgeContext,
     HubFeatures,
     build_model,
