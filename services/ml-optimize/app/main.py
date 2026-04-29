@@ -21,6 +21,9 @@ from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_
 from pydantic import BaseModel, Field
 
 from .optimizer import OptimizerInput, optimize
+from .telemetry import init_telemetry, instrument_app
+
+init_telemetry("ml-optimize")
 
 
 structlog.configure(processors=[structlog.processors.JSONRenderer()])
@@ -43,6 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="ml-optimize", version="0.1.0", lifespan=lifespan)
+instrument_app(app)
 
 
 class OptimizeRequest(BaseModel):

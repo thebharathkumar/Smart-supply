@@ -1,3 +1,4 @@
+import './instrument.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';

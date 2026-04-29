@@ -89,6 +89,9 @@ services:
       ML_FORECAST_URL: http://ml-forecast:8001
       ML_OPTIMIZE_URL: http://ml-optimize:8002
       ML_AGENT_URL: http://ml-agent:8003
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
+      OTEL_SERVICE_NAME: smart-supply-backend
+      OTEL_DISABLED: ${OTEL_DISABLED:-true}
     ports:
       - "4000:4000"
     healthcheck:
@@ -137,6 +140,8 @@ services:
       postgres: { condition: service_healthy }
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-smartsupply}:${POSTGRES_PASSWORD:-changeme_dev_only}@postgres:5432/${POSTGRES_DB:-smartsupply}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
+      OTEL_DISABLED: ${OTEL_DISABLED:-true}
       PORT: 8001
     ports:
       - "8001:8001"
@@ -156,6 +161,8 @@ services:
       postgres: { condition: service_healthy }
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-smartsupply}:${POSTGRES_PASSWORD:-changeme_dev_only}@postgres:5432/${POSTGRES_DB:-smartsupply}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
+      OTEL_DISABLED: ${OTEL_DISABLED:-true}
       PORT: 8002
     ports:
       - "8002:8002"
@@ -175,6 +182,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-smartsupply}:${POSTGRES_PASSWORD:-changeme_dev_only}@postgres:5432/${POSTGRES_DB:-smartsupply}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
+      OTEL_DISABLED: ${OTEL_DISABLED:-true}
       PORT: 8003
     ports:
       - "8003:8003"

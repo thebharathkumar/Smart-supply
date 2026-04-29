@@ -24,6 +24,9 @@ from pydantic import BaseModel, Field
 from .config import load_settings
 from .db import Db
 from .forecaster import fit_prophet
+from .telemetry import init_telemetry, instrument_app
+
+init_telemetry("ml-forecast")
 
 
 structlog.configure(
@@ -58,6 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="ml-forecast", version="0.1.0", lifespan=lifespan)
+instrument_app(app)
 
 
 class ForecastPointDTO(BaseModel):

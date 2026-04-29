@@ -21,6 +21,7 @@ import { TRANSPORT_MODE_FACTORS } from './lib/factors.js';
 import type postgres from 'postgres';
 import type { WsHub } from './ws-hub.js';
 import type { Logger } from './logger.js';
+import { withSpan } from './telemetry.js';
 
 interface RouteState {
   routeId: string;
@@ -157,11 +158,23 @@ export class StreamConsumer {
   }
 
   private async flushWindow(w: RouteState): Promise<void> {
+    return withSpan(
+      'stream.flush_window',
+      async (span) => this.doFlushWindow(w, span),
+      { 'route.id': w.routeId, 'window.samples': w.samples },
+    );
+  }
+
+  private async doFlushWindow(
+    w: RouteState,
+    span: { setAttribute: (k: string, v: number) => void },
+  ): Promise<void> {
     const ts = new Date(w.windowStart + WINDOW_MS / 2);
     // Score: lower intensity per km is better. Map to 0-100.
     const intensity = w.sumCo2Kg / Math.max(w.samples, 1);
     const factor = TRANSPORT_MODE_FACTORS[w.transportMode];
     const score = Math.max(0, Math.min(100, 100 - intensity * 30 - factor * 50));
+    span.setAttribute('score.value', score);
 
     // Persist to TimescaleDB.
     await this.sql.begin(async (tx) => {
