@@ -34,12 +34,13 @@ export function startTelemetry(): void {
     }),
     traceExporter: new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }),
     // OTel ships two copies of MetricReader through the auto-instrumentation
-    // dep tree; tsc sees them as separate types. Cast through unknown to
-    // sidestep the false-positive nominal mismatch.
+    // dep tree; tsc sees them as separate types. Cast escapes the
+    // false-positive nominal mismatch - both classes are identical at runtime.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     metricReader: new PeriodicExportingMetricReader({
       exporter: new OTLPMetricExporter({ url: `${endpoint}/v1/metrics` }),
       exportIntervalMillis: 30_000,
-    }) as unknown as ConstructorParameters<typeof NodeSDK>[0]['metricReader'],
+    }) as any,
     instrumentations: [
       getNodeAutoInstrumentations({
         // fs noise drowns out app spans; turn it off.
