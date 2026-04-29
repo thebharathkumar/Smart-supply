@@ -30,9 +30,10 @@ async function main(): Promise<void> {
       .sort();
 
     for (const file of files) {
-      const [{ count }] = (await sql`
+      const rows = (await sql`
         SELECT COUNT(*)::int AS count FROM _migrations WHERE name = ${file}
       `) as Array<{ count: number }>;
+      const count = rows[0]?.count ?? 0;
       if (count > 0) {
         console.log(`[migrate] skip ${file} (already applied)`);
         continue;

@@ -67,9 +67,10 @@ async function main(): Promise<void> {
   const sql = postgres(url, { max: 4, prepare: false });
 
   try {
-    const [{ count: existing }] = (await sql`
+    const countRows = (await sql`
       SELECT COUNT(*)::int AS count FROM suppliers
     `) as Array<{ count: number }>;
+    const existing = countRows[0]?.count ?? 0;
 
     if (existing > 0) {
       console.log(`[seed] suppliers already present (${existing}); skipping`);
@@ -77,11 +78,19 @@ async function main(): Promise<void> {
     }
 
     console.log('[seed] inserting hubs');
-    const hubRows = await sql`
+    const hubRows = (await sql`
       INSERT INTO hubs ${sql(HUBS.map((h) => ({ ...h })))}
       RETURNING id, name, country, type, lat, lng
-    `;
-    const hubsByCountry = new Map<string, typeof hubRows>();
+    `) as unknown as Array<{
+      id: string;
+      name: string;
+      country: string;
+      type: 'port' | 'airport' | 'rail' | 'warehouse';
+      lat: number;
+      lng: number;
+    }>;
+    type HubRow = (typeof hubRows)[number];
+    const hubsByCountry = new Map<string, HubRow[]>();
     for (const h of hubRows) {
       const list = hubsByCountry.get(h.country) ?? [];
       list.push(h);
@@ -118,10 +127,14 @@ async function main(): Promise<void> {
       };
     });
 
-    const suppliers = await sql`
+    const suppliers = (await sql`
       INSERT INTO suppliers ${sql(suppliersToInsert)}
       RETURNING id, country, transport_modes
-    `;
+    `) as unknown as Array<{
+      id: string;
+      country: string;
+      transport_modes: string[];
+    }>;
 
     console.log('[seed] inserting routes');
     const ROUTE_COUNT = 50;
@@ -149,10 +162,15 @@ async function main(): Promise<void> {
       };
     });
 
-    const routes = await sql`
+    const routes = (await sql`
       INSERT INTO routes ${sql(routesToInsert)}
       RETURNING id, supplier_id, distance_km, transport_mode
-    `;
+    `) as unknown as Array<{
+      id: string;
+      supplier_id: string;
+      distance_km: number;
+      transport_mode: TransportMode;
+    }>;
 
     console.log('[seed] generating 6 months of telemetry');
     // 6 months, 1 sample per hour per route. ~50 routes * 24 * 180 = 216k rows.
