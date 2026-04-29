@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-ink-950 text-ink-50 font-sans antialiased;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-ink-900 border border-ink-800 rounded-xl p-4 shadow-lg;
+  }
+  .btn {
+    @apply px-3 py-1.5 rounded-md bg-accent-600 hover:bg-accent-500 text-ink-950 text-sm font-medium transition;
+  }
+  .btn-ghost {
+    @apply px-3 py-1.5 rounded-md border border-ink-800 hover:border-accent-500 text-ink-50 text-sm transition;
+  }
+  .stat-label {
+    @apply text-xs uppercase tracking-wider text-ink-100/60;
+  }
+  .stat-value {
+    @apply text-2xl font-mono text-accent-400;
+  }
+}
+
+/* Leaflet dark theme tweaks */
+.leaflet-container {
+  background: #070b13 !important;
+}
+.leaflet-tile {
+  filter: brightness(0.6) invert(1) contrast(0.8) hue-rotate(200deg) saturate(0.6) brightness(0.7);
+}
