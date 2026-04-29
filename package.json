@@ -1,0 +1,29 @@
+{
+  "name": "smart-supply",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Intelligent supply chain carbon footprint optimizer - AI-native architecture",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "build": "pnpm -r --filter './apps/*' --filter './packages/*' build",
+    "dev": "pnpm -r --parallel --filter './apps/*' dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @smart-supply/db migrate",
+    "db:seed": "pnpm --filter @smart-supply/db seed",
+    "docker:up": "docker compose -f infra/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infra/docker-compose.yml down",
+    "docker:logs": "docker compose -f infra/docker-compose.yml logs -f",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.2"
+  }
+}

@@ -1,0 +1,53 @@
+# Node
+node_modules/
+dist/
+build/
+.next/
+.vite/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# Data / artifacts
+data/
+*.db
+*.sqlite
+models/*.pkl
+models/*.pt
+
+# Docker
+.docker/
+
+# Coverage
+coverage/
+.coverage
+htmlcov/

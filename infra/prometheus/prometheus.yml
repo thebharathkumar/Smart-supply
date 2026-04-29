@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: backend
+    static_configs:
+      - targets: ["backend:4000"]
+    metrics_path: /metrics
+
+  - job_name: ml-forecast
+    static_configs:
+      - targets: ["ml-forecast:8001"]
+    metrics_path: /metrics
+
+  - job_name: ml-optimize
+    static_configs:
+      - targets: ["ml-optimize:8002"]
+    metrics_path: /metrics
+
+  - job_name: ml-agent
+    static_configs:
+      - targets: ["ml-agent:8003"]
+    metrics_path: /metrics
