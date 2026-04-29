@@ -16,6 +16,7 @@ import { routeRoutes } from './routes/routes-api.js';
 import { hubRoutes } from './routes/hubs.js';
 import { forecastRoutes } from './routes/forecast.js';
 import { agentRoutes } from './routes/agent.js';
+import { optimizeRoutes } from './routes/optimize.js';
 
 declare module 'fastify' {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -48,6 +49,7 @@ async function buildApp(cfg: AppConfig, log: Logger) {
   app.register(hubRoutes);
   app.register(forecastRoutes);
   app.register(agentRoutes);
+  app.register(optimizeRoutes);
 
   // WebSocket endpoint
   app.register(async (instance) => {

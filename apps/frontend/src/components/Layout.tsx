@@ -3,6 +3,7 @@ import { useWsStore } from '../lib/ws';
 
 const NAV = [
   { to: '/', label: 'Operations Map' },
+  { to: '/network', label: 'Network' },
   { to: '/forecast', label: 'Forecast' },
   { to: '/agent', label: 'Agent Console' },
 ];
