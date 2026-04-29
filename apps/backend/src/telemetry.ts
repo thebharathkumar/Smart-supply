@@ -33,10 +33,13 @@ export function startTelemetry(): void {
       [ATTR_SERVICE_VERSION]: process.env.npm_package_version ?? '0.1.0',
     }),
     traceExporter: new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }),
+    // OTel ships two copies of MetricReader through the auto-instrumentation
+    // dep tree; tsc sees them as separate types. Cast through unknown to
+    // sidestep the false-positive nominal mismatch.
     metricReader: new PeriodicExportingMetricReader({
       exporter: new OTLPMetricExporter({ url: `${endpoint}/v1/metrics` }),
       exportIntervalMillis: 30_000,
-    }),
+    }) as unknown as ConstructorParameters<typeof NodeSDK>[0]['metricReader'],
     instrumentations: [
       getNodeAutoInstrumentations({
         // fs noise drowns out app spans; turn it off.

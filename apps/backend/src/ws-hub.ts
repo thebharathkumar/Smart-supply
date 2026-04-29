@@ -97,7 +97,7 @@ export class WsHub {
     });
 
     socket.on('close', () => this.subscribers.delete(id));
-    socket.on('error', (err) => {
+    socket.on('error', (err: Error) => {
       this.log.warn({ err, sessionId: id }, 'ws error');
       this.subscribers.delete(id);
     });
