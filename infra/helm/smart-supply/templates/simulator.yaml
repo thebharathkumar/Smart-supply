@@ -1,0 +1,30 @@
+{{- if .Values.simulator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-simulator
+  labels:
+    {{- include "smart-supply.labels" . | nindent 4 }}
+    app.kubernetes.io/component: simulator
+spec:
+  replicas: {{ .Values.simulator.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "smart-supply.componentSelector" (dict "Release" .Release "Values" .Values "component" "simulator") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "smart-supply.componentSelector" (dict "Release" .Release "Values" .Values "component" "simulator") | nindent 8 }}
+    spec:
+      containers:
+        - name: simulator
+          image: {{ include "smart-supply.image" (dict "Values" .Values "repository" .Values.simulator.image.repository) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "smart-supply.commonEnv" . | nindent 12 }}
+            - name: SIM_EVENTS_PER_SEC
+              value: {{ .Values.simulator.env.SIM_EVENTS_PER_SEC | quote }}
+            - name: SIM_SHIPMENTS
+              value: {{ .Values.simulator.env.SIM_SHIPMENTS | quote }}
+          resources: {{- toYaml .Values.simulator.resources | nindent 12 }}
+{{- end }}

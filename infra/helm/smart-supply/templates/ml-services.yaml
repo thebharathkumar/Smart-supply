@@ -1,0 +1,100 @@
+{{- /*
+  Three near-identical Python services rendered from a single block.
+  Each declares a Deployment, Service, and (optionally) HPA.
+*/ -}}
+{{- range $svc := list "mlForecast" "mlOptimize" "mlAgent" -}}
+{{- $cfg := index $.Values $svc -}}
+{{- $name := dict "mlForecast" "ml-forecast" "mlOptimize" "ml-optimize" "mlAgent" "ml-agent" | get $svc -}}
+{{- $port := $cfg.service.port -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  labels:
+    {{- include "smart-supply.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  replicas: {{ $cfg.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "smart-supply.componentSelector" (dict "Release" $.Release "Values" $.Values "component" $name) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "smart-supply.componentSelector" (dict "Release" $.Release "Values" $.Values "component" $name) | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ $port | quote }}
+        prometheus.io/path: /metrics
+    spec:
+      containers:
+        - name: {{ $name }}
+          image: {{ include "smart-supply.image" (dict "Values" $.Values "repository" $cfg.image.repository) }}
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          ports:
+            - { name: http, containerPort: {{ $port }} }
+          env:
+            {{- include "smart-supply.commonEnv" $ | nindent 12 }}
+            - name: PORT
+              value: {{ $port | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: smart-supply-{{ $name }}
+            {{- if eq $svc "mlAgent" }}
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $cfg.anthropic.existingSecret }}
+                  key: {{ $cfg.anthropic.secretKey }}
+                  optional: true
+            - name: ANTHROPIC_MODEL
+              value: {{ $cfg.anthropic.model | quote }}
+            - name: ML_FORECAST_URL
+              value: http://{{ $.Release.Name }}-ml-forecast:{{ $.Values.mlForecast.service.port }}
+            - name: ML_OPTIMIZE_URL
+              value: http://{{ $.Release.Name }}-ml-optimize:{{ $.Values.mlOptimize.service.port }}
+            {{- end }}
+          resources: {{- toYaml $cfg.resources | nindent 12 }}
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  labels:
+    {{- include "smart-supply.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  selector:
+    {{- include "smart-supply.componentSelector" (dict "Release" $.Release "Values" $.Values "component" $name) | nindent 4 }}
+  ports:
+    - { name: http, port: {{ $port }}, targetPort: http }
+{{- if and $cfg.hpa $cfg.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $.Release.Name }}-{{ $name }}
+  minReplicas: {{ $cfg.hpa.minReplicas }}
+  maxReplicas: {{ $cfg.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $cfg.hpa.targetCPUUtilizationPercentage }}
+{{- end }}
+{{- end }}

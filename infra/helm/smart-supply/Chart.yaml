@@ -1,0 +1,17 @@
+apiVersion: v2
+name: smart-supply
+description: Intelligent Supply Chain Carbon Footprint Optimizer
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+icon: https://raw.githubusercontent.com/example/smart-supply/main/apps/frontend/public/favicon.svg
+keywords:
+  - supply-chain
+  - carbon
+  - timescaledb
+  - kafka
+  - ai-agent
+home: https://github.com/example/smart-supply
+maintainers:
+  - name: smart-supply
+    email: ops@example.com

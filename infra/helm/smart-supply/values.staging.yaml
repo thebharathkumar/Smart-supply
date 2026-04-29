@@ -1,0 +1,29 @@
+# Staging overlay: smaller replicas, simulator on, less aggressive HPA.
+global:
+  domain: staging.smart-supply.example.com
+
+backend:
+  replicaCount: 1
+  hpa: { enabled: false }
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+
+frontend:
+  replicaCount: 1
+
+simulator:
+  enabled: true
+
+mlForecast:
+  replicaCount: 1
+  hpa: { enabled: false }
+
+mlOptimize:
+  replicaCount: 1
+  hpa: { enabled: false }
+
+mlAgent:
+  replicaCount: 1
+
+ingress:
+  certIssuer: letsencrypt-staging

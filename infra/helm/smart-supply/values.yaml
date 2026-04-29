@@ -1,0 +1,137 @@
+# Default values for smart-supply.
+# Overridden per environment via values.staging.yaml / values.prod.yaml.
+
+global:
+  imageRegistry: ghcr.io/example
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  domain: smart-supply.example.com
+  storageClass: ""
+
+image:
+  tag: latest
+
+# Set to false when relying on an external Postgres / Redis / Kafka.
+postgres:
+  enabled: false
+  external:
+    host: postgres-primary.data
+    port: 5432
+    database: smartsupply
+    existingSecret: smart-supply-postgres
+    passwordKey: password
+    userKey: username
+
+redis:
+  enabled: false
+  external:
+    host: redis.data
+    port: 6379
+
+kafka:
+  brokers: redpanda.data:9092
+
+backend:
+  replicaCount: 3
+  image:
+    repository: smart-supply-backend
+  resources:
+    limits: { cpu: "1", memory: "1Gi" }
+    requests: { cpu: "200m", memory: "256Mi" }
+  service:
+    type: ClusterIP
+    port: 4000
+  env:
+    LOG_LEVEL: info
+    OTEL_DISABLED: "false"
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 70
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: smart-supply-frontend
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "50m", memory: "64Mi" }
+  service:
+    type: ClusterIP
+    port: 80
+
+simulator:
+  enabled: false   # Off in prod by default; enable in staging only.
+  replicaCount: 1
+  image:
+    repository: smart-supply-simulator
+  resources:
+    limits: { cpu: "500m", memory: "256Mi" }
+    requests: { cpu: "100m", memory: "64Mi" }
+  env:
+    SIM_EVENTS_PER_SEC: "200"
+    SIM_SHIPMENTS: "50"
+
+mlForecast:
+  replicaCount: 2
+  image:
+    repository: smart-supply-ml-forecast
+  resources:
+    limits: { cpu: "2", memory: "2Gi" }
+    requests: { cpu: "500m", memory: "1Gi" }
+  service:
+    port: 8001
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 75
+
+mlOptimize:
+  replicaCount: 2
+  image:
+    repository: smart-supply-ml-optimize
+  resources:
+    limits: { cpu: "1", memory: "1Gi" }
+    requests: { cpu: "200m", memory: "256Mi" }
+  service:
+    port: 8002
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+mlAgent:
+  replicaCount: 2
+  image:
+    repository: smart-supply-ml-agent
+  resources:
+    limits: { cpu: "500m", memory: "512Mi" }
+    requests: { cpu: "100m", memory: "128Mi" }
+  service:
+    port: 8003
+  # ANTHROPIC_API_KEY MUST come from a secret; never inline.
+  anthropic:
+    existingSecret: smart-supply-anthropic
+    secretKey: api_key
+    model: claude-sonnet-4-6
+
+ingress:
+  enabled: true
+  className: nginx
+  tls: true
+  certIssuer: letsencrypt-prod
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"   # SSE friendly
+
+observability:
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    labels:
+      release: prometheus
+  otel:
+    endpoint: http://opentelemetry-collector.observability:4318
