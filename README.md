@@ -77,14 +77,16 @@ flowchart LR
 | Layer | Choice | Why |
 |---|---|---|
 | Storage | Postgres 16 + TimescaleDB + pgvector | One DB for relational + time-series + semantic search ([ADR-0002](docs/adr/0002-timescaledb.md)) |
-| Ingest | Kafka (Redpanda dev) | Durable, replayable, partition-ordered telemetry ([ADR-0004](docs/adr/0004-kafka-vs-redis-pubsub.md)) |
+| Ingest | Kafka (Redpanda dev) + Schema Registry | Durable, replayable, partition-ordered telemetry; schema drift fails at the boundary ([ADR-0004](docs/adr/0004-kafka-vs-redis-pubsub.md), [ADR-0008](docs/adr/0008-schema-registry.md)) |
 | Realtime | Redis pub/sub + WebSocket | ms-latency UI fanout decoupled from broker ([ADR-0004](docs/adr/0004-kafka-vs-redis-pubsub.md)) |
 | Backend | Fastify v5 + Drizzle + Zod | Strict types end-to-end, fast HTTP, idiomatic TS |
 | Forecasting | Prophet + naive seasonal fallback | Honest about uncertainty; backtest MAPE included |
-| Optimization | NSGA-II + Pareto front | Diverse Pareto-optimal solutions, not weighted-sum collapse ([ADR-0003](docs/adr/0003-pareto-over-single-objective.md)) |
+| Optimization | NSGA-II + Pareto front + GraphSAGE | Diverse Pareto-optimal solutions; opt-in GNN learns weather/congestion adjustments ([ADR-0003](docs/adr/0003-pareto-over-single-objective.md), [ADR-0007](docs/adr/0007-gnn-edge-weights.md)) |
 | Agent | Hand-rolled async state machine + Claude tool-use | ~250 lines vs LangGraph's 150 MB ([ADR-0005](docs/adr/0005-langgraph-agent.md)) |
 | Observability | OpenTelemetry → Jaeger + Prometheus + Grafana | One protocol, vendor-neutral, LLM token usage as span attributes ([ADR-0006](docs/adr/0006-opentelemetry.md)) |
 | Frontend | React 18 + Vite + Tailwind + Leaflet + d3-force | SSE for agent stream, WS for live scores |
+| Codegen | Zod → JSON Schema → Pydantic v2 | Single source of truth across TS + Python services ([Makefile `make codegen`]) |
+| Deploy | Helm chart with HPA + NetworkPolicy + ServiceMonitor | One-command deploys to staging or prod with overlay values |
 
 ---
 
@@ -169,18 +171,52 @@ Each script asserts the SLO it tests; thresholds documented in script headers.
 
 ---
 
-## Run the unit tests
+## Run the tests
 
 ```bash
-# TypeScript (Vitest)
-pnpm -r test
+# Unit (frontend Vitest + backend Vitest + Python pytest)
+make test
 
-# Python (pytest, async-mode auto)
-pip install -r services/requirements-dev.txt
-pytest services/ml-forecast services/ml-optimize services/ml-agent
+# E2E (Playwright on Chromium + Firefox)
+make test-e2e
+
+# Regenerate Pydantic types from the Zod source-of-truth
+make codegen
 ```
 
-Tests cover NSGA-II primitives (non-dominated sort + crowding), the optimizer's small-graph behavior, the agent coordinator's deterministic loop with mock tools, the forecaster's naive fallback, and Zod schema validation across the WS protocol and ML request shapes.
+Unit tests cover NSGA-II primitives, optimizer behavior on small graphs, agent coordinator deterministic mode with mock tools, forecaster's naive fallback, and Zod schema validation across the WS protocol + ML request shapes. GNN feature encoders are tested without requiring torch installed.
+
+E2E tests drive the four core flows (operations map, network graph, agent console, forecast view) against the live stack.
+
+---
+
+## Production deployment
+
+```bash
+# Build images and push to your registry
+make docker:build && make docker:push
+
+# Install / upgrade with the staging overlay
+helm upgrade --install smart-supply infra/helm/smart-supply \
+  --namespace smart-supply-staging --create-namespace \
+  --values infra/helm/smart-supply/values.staging.yaml \
+  --set image.tag=$GIT_SHA
+
+# Promote to prod
+helm upgrade --install smart-supply infra/helm/smart-supply \
+  --namespace smart-supply-prod --create-namespace \
+  --values infra/helm/smart-supply/values.prod.yaml \
+  --set image.tag=$GIT_SHA
+```
+
+The chart includes:
+
+- HPAs on backend / ml-forecast / ml-optimize keyed on CPU
+- NetworkPolicy default-deny + targeted allow rules
+- ServiceMonitor objects for Prometheus Operator
+- Pre-install Helm hook that runs DB migrations before any service rollout
+- Ingress with cert-manager TLS and SSE-friendly nginx annotations
+- `ANTHROPIC_API_KEY` pulled from an existing K8s secret with `optional: true` so missing key doesn't fail the deployment
 
 ---
 
@@ -216,7 +252,7 @@ smart-supply/
 
 ## Implementation status
 
-### Phase 1 + Phase 2 — complete
+### Phase 1 — complete
 
 - [x] Monorepo with pnpm workspaces, strict TypeScript, strict Python typing
 - [x] Docker Compose with Postgres+TimescaleDB+pgvector, Redis, Redpanda, all healthchecked
@@ -228,22 +264,29 @@ smart-supply/
 - [x] Kafka simulator producing position, fuel, weather, port congestion events
 - [x] React frontend: Operations Map, Network Graph (d3-force), Forecast, Agent Console
 - [x] WebSocket client with reconnect, exponential backoff, heartbeat, message queue
-- [x] **`ml-forecast`**: real Prophet forecasting + naive seasonal fallback + MAPE backtest
-- [x] **`ml-optimize`**: NSGA-II ranking (fast non-dominated sort + crowding distance) over an evolutionary perturbation step
+
+### Phase 2 — complete
+
+- [x] **`ml-forecast`**: Prophet forecasting + naive seasonal fallback + MAPE backtest
+- [x] **`ml-optimize`**: NSGA-II ranking (fast non-dominated sort + crowding distance) + one-generation evolutionary perturbation
 - [x] **`ml-agent`**: hand-rolled async state-machine coordinator with Claude tool-use, SSE streaming, deterministic-mode fallback when no API key
 - [x] **OpenTelemetry**: traces + metrics across all services, Grafana dashboard, LLM token usage as span attributes
 - [x] **k6 load tests** with SLO thresholds for the four perf targets
 - [x] **Unit tests**: NSGA-II primitives, optimizer, agent coordinator, forecaster, backend Zod schemas
+
+### Phase 3 — complete
+
+- [x] **GNN edge-weight predictor** (PyTorch Geometric, GraphSAGE + per-edge MLP head). Opt-in via `useGnn:true`; service runs with baseline factors when the checkpoint is absent.
+- [x] **Helm chart** under `infra/helm/smart-supply` with values overlays for staging + prod, HPAs, ServiceMonitors, NetworkPolicies, pre-install migration job.
+- [x] **Playwright E2E** suite covering operations map, network graph, agent console, forecast view (Chromium + Firefox).
+- [x] **Pydantic-from-Zod codegen** pipeline (`make codegen`) so Python services share types with `packages/shared-types` automatically.
+- [x] **Schema registry** integration with Redpanda's built-in registry: schema-id headers on every Kafka message, header + Zod validation on every consumer.
+
+### Engineering hygiene
+
 - [x] Jenkinsfile + GitHub Actions CI
-- [x] 6 ADRs covering monorepo, TimescaleDB, Pareto, Kafka vs Redis, agent coordinator, OpenTelemetry
-
-### Phase 3 — explicitly out of scope
-
-- [ ] **GNN edge-weight predictor** (PyTorch Geometric) trained on historical telemetry to adjust transport-mode emission factors for weather / congestion. Useful but high cost-per-impact.
-- [ ] **Helm chart** under `infra/helm/`. Compose covers dev and most demos; Helm becomes essential when running multi-replica.
-- [ ] **Playwright E2E** suite. Backend-driven tests cover most behavior today.
-- [ ] **Pydantic-from-JSON-Schema** generation so Python services share types with `packages/shared-types` rather than mirroring them.
-- [ ] **Schema registry** for Kafka events (Confluent / Redpanda built-in).
+- [x] **8 ADRs**: monorepo, TimescaleDB, Pareto, Kafka vs Redis, agent coordinator, OpenTelemetry, GNN, schema registry
+- [x] Project Makefile centralizes `codegen / test / test-e2e / lint / format / up / down / migrate / seed`
 
 ---
 
