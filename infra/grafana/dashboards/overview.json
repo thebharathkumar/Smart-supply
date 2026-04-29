@@ -1,0 +1,154 @@
+{
+  "title": "Smart Supply — Overview",
+  "uid": "smart-supply-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["smart-supply"],
+  "timezone": "browser",
+  "time": { "from": "now-30m", "to": "now" },
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "ML Forecast — Requests / sec",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(forecast_requests_total[1m]))",
+          "refId": "A"
+        }
+      ],
+      "options": { "graphMode": "area", "colorMode": "value" }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "ML Optimize — Requests / sec",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(optimize_requests_total[1m]))",
+          "refId": "A"
+        }
+      ],
+      "options": { "graphMode": "area", "colorMode": "value" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "ML Agent — Requests / sec",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(agent_requests_total[1m]))",
+          "refId": "A"
+        }
+      ],
+      "options": { "graphMode": "area", "colorMode": "value" }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Active Errors (any service)",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({__name__=~\".*_requests_total\", status!=\"ok\"}[5m]))",
+          "refId": "A"
+        }
+      ],
+      "options": { "graphMode": "area", "colorMode": "value" }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Forecast latency (s) — p50 / p95 / p99",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(forecast_request_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(forecast_request_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(forecast_request_seconds_bucket[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Optimize latency (s) — p50 / p95 / p99",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(optimize_request_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(optimize_request_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(optimize_request_seconds_bucket[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Agent latency (s) — p50 / p95 / p99",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(agent_request_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(agent_request_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(agent_request_seconds_bucket[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Forecast / Optimize requests by status",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(forecast_requests_total[5m]))",
+          "legendFormat": "forecast {{status}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (status) (rate(optimize_requests_total[5m]))",
+          "legendFormat": "optimize {{status}}",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}
